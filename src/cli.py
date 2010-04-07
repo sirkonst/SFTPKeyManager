@@ -12,8 +12,8 @@ CLI интерфейс
 from optparse import OptionParser
 import SFTPKeyManager as SKM
 
-SKM.defaultkeypath = "../test/authorized_keys/rsa.pub/"
-SKM.defaultuserpath = "../test/authorized_keys/"
+#SKM.defaultkeypath = "../test/authorized_keys/rsa.pub/"
+#SKM.defaultuserpath = "../test/authorized_keys/"
 
 def opt_key_list(verbose=False):
     keys = SKM.keylist()
