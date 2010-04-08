@@ -79,6 +79,10 @@ if __name__ == '__main__':
     parser.add_option('-z', '--zero', action='store_true', help=u'Оннулировать все доступы по ключу')
     (options, args) = parser.parse_args()
     
+    import sys
+    if len(sys.argv[1:]) == 0:
+        parser.print_help()
+    
     if options.zero:
         opt_zero_key(args)
         exit(0)
