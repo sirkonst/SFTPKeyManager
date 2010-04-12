@@ -9,6 +9,8 @@ Created on 30.03.2010
 CLI интерфейс
 '''
 
+import sys
+import fileinput
 from optparse import OptionParser
 import SFTPKeyManager as SKM
 
@@ -19,7 +21,7 @@ def opt_key_list(verbose=False):
     keys = SKM.keylist()
     print 'Список доступных ключей:'
     for k in keys:
-        print verbose and '\t* %s (%s)' % (k, keys[k]) or '\t* ', k
+        print verbose and '\t* %s (%s)' % (k, keys[k]) or '\t* %s' % k
 
 def opt_user_list():
     users = SKM.useraccesslist()
@@ -68,21 +70,20 @@ def opt_zero_key(keys):
         if SKM.zerokey(key):
             print "Удалены все доступы по ключу '%s'." % key 
 
-if __name__ == '__main__':
+def main():
     parser = OptionParser()
     parser.add_option('-v', '--verbose', action='store_true', dest='verbose', default=False, help=u'Включить подробный вывод')
     parser.add_option('-k', '--key-list', action='store_true', dest='key_list', help=u'Список ключей')
     parser.add_option('-u', '--user-list', action='store_true', dest='user_list', help=u'Список пользователей')
     parser.add_option('-a', '--append-access', dest='append_access', metavar='USER', help=u'Добавить к пользователю доступ по ключу')
     parser.add_option('-r', '--remove-access', dest='remove_access', metavar='USER', help=u'Удалить доступ к пользователю по ключу')
-    parser.add_option('-n', '--new-key', action='store_true', dest='new_key', help=u'Добавить новый ключ. Чтение с stdin.')
+    parser.add_option('-n', '--new-key', action='store_true', dest='new_key', help=u'Добавить новый ключ из файла(ов) или стандартного ввода.')
     parser.add_option('-z', '--zero', action='store_true', help=u'Оннулировать все доступы по ключу')
     (options, args) = parser.parse_args()
     
-    import sys
+    
     if len(sys.argv[1:]) == 0:
         parser.print_help()
-    
     if options.zero:
         opt_zero_key(args)
         exit(0)
@@ -100,6 +101,9 @@ if __name__ == '__main__':
     if options.key_list:
         opt_key_list(options.verbose)
     if options.user_list:
-        opt_user_list()
+        opt_user_list()    
+
+if __name__ == '__main__':
+    main()
 
     

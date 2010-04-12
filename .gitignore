@@ -2,3 +2,7 @@
 .pydevproject
 .settings/
 test/
+SFTPKeyManager.egg-info/
+build/
+dist/
+

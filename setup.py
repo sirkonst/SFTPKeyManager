@@ -1,6 +1,6 @@
-#!/usr/bin/env python
+      #!/usr/bin/env python
 
-from distutils.core import setup
+from setuptools import setup
 
 setup(name='SFTPKeyManager',
       version='0.1.1',
@@ -11,5 +11,7 @@ setup(name='SFTPKeyManager',
       url='http://wiki.enchtex.info',
       packages = ['SFTPKeyManager'],
       package_dir = {'SFTPKeyManager': 'src'},
-      scripts=['src/skeyctl'],
+      entry_points = {
+                      'console_scripts': ['skeyctl = SFTPKeyManager.cli:main']
+                      },        
      )
