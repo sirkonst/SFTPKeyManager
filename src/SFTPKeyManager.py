@@ -1,19 +1,18 @@
 # -*- coding: utf-8 -*-
 
-'''
-Created on 30.03.2010
-
-@author: konst
-'''
+################ Общие модули ################
 
 import os
+import re
 
-from SFTPKey import SFTPKey
+################ Переменные ################
 
 defaultkeypath = "/etc/proftpd/accounts/sftp/keys/"
 defaultuserpath = "/etc/proftpd/accounts/sftp/users/"
 
-# Иерархтя ошибок
+re_username = re.compile(r' (\S+@\S+)"$')
+
+################ Ошибки ################ 
 
 class SFTPKeyManagerError (Exception):
     """ Общая неопределенная ошибка """
@@ -28,96 +27,138 @@ class E_FILE_NOT_FOUND (SFTPKeyManagerError):
     """ Файл не найден """
     pass
 
-def keylist():
-    """"
-    Возвращает словать в формате: имя пользователя ключа: файл ключа 
-    """
-    path = defaultkeypath
-    files = os.listdir(path)
-    users = {}
-    for filename in files:
-        sftp = SFTPKey(path+filename)
-        for u in sftp.getusernames():
-                users[u] = sftp.filekey
-    return users
+################ Логика ################ 
 
-def useraccesslist():
-    """
-    Возращает словать в формате: имя пользователя: (список: ключей доступа)
-    """
-    path = defaultuserpath
-    files = os.listdir(path)
-    users = {}
-    for filename in files:
-        if os.path.isfile(path+filename):
-            sftp = SFTPKey(path+filename)
-            users[filename] = sftp.getusernames()
-    return users
-
-def addaccess(username, userkeyname):
-    ''' Разрешает доступ к пользователю username по ключу userkeyname '''
-    klist = keylist()
-    kaccess = useraccesslist()
-    if not klist.has_key(userkeyname):
-        raise E_KEY_NOT_FOUND
-    if kaccess.has_key(username):
-        if userkeyname in kaccess[username]:
-            raise E_KEY_ALREADY_ASSIGNED
-    with open(defaultuserpath+'/'+username, 'a') as f:
-        rawkey = SFTPKey(klist[userkeyname]).getrawkey(userkeyname)
-        f.write(rawkey)
-        return True
-    
-def removeaccess(username, userkeyname):
-    ''' Удаления достопа к пользователю по ключу '''
-    f_name = defaultuserpath+'/'+username
-    if not os.path.isfile(f_name):
+def read_sftp_names(file):
+    """ Чтение из файла file списка имен sftp ключей """
+    if not os.path.isfile(file):
         raise E_FILE_NOT_FOUND
-    sftp = SFTPKey(f_name)
-    access = sftp.getusernames()
-    if userkeyname in access:
-        access.remove(userkeyname)
-    else:
-        raise E_KEY_NOT_FOUND
-    if access:
-        os.remove(f_name)
-        for acc in access:
-            addaccess(username, acc)
-        return True
-    else:
-        open(f_name, 'w').close()
-        return True
+    # Выделение имени
+    _gcu = lambda text:  re_username.search(text).groups()[0]
+    
+    with open(file, 'r') as f:
+        return [_gcu(f.next()) for line in f if line == '---- BEGIN SSH2 PUBLIC KEY ----\n']
 
-def addnewkey(keytext):
-    """ Добавление нового ключа из keytext """
-    name = ""
-    for line in keytext.split('\n'):
-        s = SFTPKey.re_username.search(line)
-        if s:
-            name = s.groups()[0]
-            break
-    if name != "":
-        klist = keylist()
-        if name in klist:
-            raise E_KEY_ALREADY_ASSIGNED
+def _get_key(name, i_text, ctext):
+    key = ['---- BEGIN SSH2 PUBLIC KEY ----', ctext.strip('\n')]
+    for line in i_text:
+        line = line.strip('\n')
+        if line != '---- END SSH2 PUBLIC KEY ----':
+            key.append(line)
         else:
-            skey = SFTPKey( os.path.join(defaultkeypath, name) )
-            skey.writekey(keytext)
-            return {name: skey.filekey}
+            break
+    key.append('---- END SSH2 PUBLIC KEY ----\n')
+    return (name, '\n'.join(key))
+
+def read_sftp_key(file, keyname):
+    """ Чтение SFTP ключа из файла file по имени keyname """
+    if not os.path.isfile(file):
+        raise E_FILE_NOT_FOUND
+    # Выделение имени и исходнос строки (Comment)
+    _gcu = lambda text:  (re_username.search(text).groups()[0], text)
+
+    with open(file, 'r') as f:
+        for name, text in (_gcu(f.next()) for line in f if line == '---- BEGIN SSH2 PUBLIC KEY ----\n'):
+            if name == keyname:
+                key = _get_key(name, f, text)
+                break
+    return key[1]
+
+def read_sftp_key_old(file, keyname):
+    """ Чтение SFTP ключа из файла file по имени keyname """
+    # Выделение имени и исходнос строки (Comment)
+    _gcu = lambda text:  (re_username.search(text).groups()[0], text)
+    # Выделение ключа c Comment
+    _grk = lambda f, text: text + ''.join(line for line in f if line != '---- END SSH2 PUBLIC KEY ----\n')
+    with open(file, 'r') as f:
+        key = [_grk(f, text) for name, text in (_gcu(f.next()) for line in f if line == '---- BEGIN SSH2 PUBLIC KEY ----\n') if name == keyname]
+    return '---- BEGIN SSH2 PUBLIC KEY ----\n%s---- END SSH2 PUBLIC KEY ----\n' % key[0]
+
+def keylist():
+    """ Возвращает словать в формате: имя пользователя ключа -> файл ключа  """
+    dict = {}
+    for file in (file for file in os.listdir(defaultkeypath)
+                 if os.path.isfile( os.path.join(defaultkeypath, file) )
+                 ):
+        filename = os.path.abspath(os.path.join(defaultkeypath, file))
+        for name in read_sftp_names(filename):
+            dict[name] = filename
+    return dict
+
+def ftpuseraccesslist():
+    """ Возращает словать в формате: имя пользователя ftp -> (список ключей доступа) """
+    dict = {}
+    for file in (file for file in os.listdir(defaultuserpath)
+                 if os.path.isfile(os.path.join(defaultuserpath, file))
+                 ):
+        filename = os.path.abspath(os.path.join(defaultuserpath, file))
+        dict[file] = read_sftp_names(filename)
+    return dict
+
+def addaccess(ftpuser, keyname):
+    """ Разрешает доступ к пользователю ftpuser по ключу keyname """
+    keys = keylist()
+    filename = os.path.join(defaultuserpath, ftpuser)
+    if keyname not in keys:
+        raise E_KEY_NOT_FOUND
+    if os.path.isfile(filename) and keyname in read_sftp_names(filename):
+        raise E_KEY_ALREADY_ASSIGNED
+    with open(os.path.join(filename), 'a') as f:
+        f.write(read_sftp_key(keys[keyname], keyname))
+        return True
+
+def removeaccess(ftpuser, keyname):
+    """ Удаления достопа к пользователю по ключу """
+    filename = os.path.join(defaultuserpath, ftpuser)
+    keys = read_sftp_names(filename)
+    if keyname not in keys:
+        raise E_KEY_NOT_FOUND
+    keys.remove(keyname)
+    if keys:
+        os.remove(filename)
+        [addaccess(ftpuser, key) for key in keys]
+        return True
+    else:
+        open(filename, 'w').close()
+        return True
+
+def zerokey(keyname):
+    """ Оннулировать все доступы по ключу. Возвращает список пользователей где был удален ключ """
+    keys = ftpuseraccesslist()
+    return [uftp for ret, uftp in 
+            ((removeaccess(uftp, keyname), uftp) 
+                for uftp in keys if keyname in keys[uftp])
+            ]
+
+def safenewkeys(text):
+    """ Сохраняет ключи в файлы. Возвращает словарь - 'имя ключа': 'путь к файлу' """
+    dict = {}
+    i_text = iter(text.splitlines())
+    # Выделение имени и исходной строки (Comment)
+    _gcu = lambda text: ((re_username.search(text).groups()[0]), text)
+
+    for name, keytext in (_get_key(name, i_text, ctext) for name, ctext in 
+                      (_gcu(i_text.next()) for line in i_text if line == '---- BEGIN SSH2 PUBLIC KEY ----')
+                    ):
+        filename = os.path.join(defaultkeypath, name)
+        if os.path.isfile(filename):
+            raise E_KEY_ALREADY_ASSIGNED, (name, filename)
+        else:
+            with open(filename, 'w') as f:
+                f.write(keytext)
+                dict[name] = filename
+    if dict:
+        return dict
     else:
         raise E_KEY_NOT_FOUND
-
-def zerokey(key):
-    """ Оннулировать все доступы по ключу. Возвращает число отметенных доступов """
-    keys = useraccesslist()
-    count = 0
-    for u in keys:
-        if key in keys[u]:
-            removeaccess(u, key)
-            count += 1
-    return count
 
 if __name__ == '__main__':
-    addaccess("test-site.kolos", "konst@gentoo-book")
-    addaccess("test-site.kolos", "test@test")
-    removeaccess("test-site.kolos", "test@test")
+    #addaccess('corp.kolos', 'new@test.my')
+    #addaccess('corp.kolos', 'test@test')
+    #addaccess('test-site', 'new@test.my')
+    #addaccess('test-site', 'test@test')
+    #removeaccess('corp.kolos', 'new@test.my')
+    #print ftpuseraccesslist()
+    #print zerokey('test@test')
+    #print ftpuseraccesslist()
+    print read_sftp_key('/home/konst/devel/eclipse/workspace/KeyManager/test/authorized_keys/rsa.pub/multitest', 'new@test.my')
