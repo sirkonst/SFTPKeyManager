@@ -5,4 +5,4 @@ test/
 SFTPKeyManager.egg-info/
 build/
 dist/
-
+*.pyc
