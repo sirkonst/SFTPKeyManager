@@ -147,7 +147,10 @@ def safenewkeys(text):
             with open(filename, 'w') as f:
                 f.write(keytext)
                 dict[name] = filename
-    return dict
+    if dict:
+        return dict
+    else:
+        raise E_KEY_NOT_FOUND
 
 if __name__ == '__main__':
     #addaccess('corp.kolos', 'new@test.my')

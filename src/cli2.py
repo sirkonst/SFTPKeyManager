@@ -66,16 +66,20 @@ def opt_new_key(text):
     except skman.E_KEY_ALREADY_ASSIGNED, (keyname, file):
         print "Ошибка: записи ключа '%s', файл '%s' уже существует." % (keyname, file)
         exit(1)
+    except skman.E_KEY_NOT_FOUND:
+        print "Ошибка: не найдено ни одного ключа."
+        exit(1)
 
 def main():
-    parser = OptionParser()
+    usage = u"SFTPKeyManager [опции] аргументы"
+    parser = OptionParser(usage=usage)
     parser.add_option('-v', '--verbose', action='store_true', dest='verbose', default=False, help=u'Включить подробный вывод')
     parser.add_option('-k', '--key-list', action='store_true', dest='key_list', help=u'Список ключей')
     parser.add_option('-u', '--user-list', action='store_true', dest='user_list', help=u'Список пользователей')
-    parser.add_option('-a', '--append-access', dest='append_access', metavar='USER', help=u'Добавить к пользователю доступ по ключу')
-    parser.add_option('-r', '--remove-access', dest='remove_access', metavar='USER', help=u'Удалить доступ к пользователю по ключу')
+    parser.add_option('-a', '--append-access', dest='append_access', metavar='USER', help=u'Добавить к пользователю доступ по указанным ключам')
+    parser.add_option('-r', '--remove-access', dest='remove_access', metavar='USER', help=u'Удалить доступ к пользователю по указанным ключам')
     parser.add_option('-n', '--new-key', action='store_true', dest='new_key', help=u'Добавить новый ключ из файла(ов) или стандартного ввода')
-    parser.add_option('-z', '--zero', action='store_true', help=u'Оннулировать все доступы по ключу(ам)')
+    parser.add_option('-z', '--zero', action='store_true', help=u'Оннулировать все доступы по указанным ключу(ам)')
     (options, args) = parser.parse_args()
     
     
