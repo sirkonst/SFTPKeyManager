@@ -1,9 +1,9 @@
-      #!/usr/bin/env python
+#!/usr/bin/env python
 
 from setuptools import setup
 
 setup(name='SFTPKeyManager',
-      version='0.1.1',
+      version='0.2.1',
       description='SFTP Key Manager',
       long_description = "My SFTP Key Manager",
       author="Konstantin vz'One Enchant",
